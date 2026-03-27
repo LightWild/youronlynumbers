@@ -1,113 +1,108 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
 <meta charset="UTF-8">
-<title>编号登记与配对</title>
+<title>编号登记与查询</title>
 <style>
 *{box-sizing:border-box}
-body{max-width:600px;margin:40px auto;padding:0 20px;font-family:system-ui}
+body{max-width:500px;margin:30px auto;padding:0 15px;font-family:Arial}
 .box{border:1px solid #ddd;border-radius:10px;padding:20px;margin-top:20px}
-label{display:block;margin:12px 0 6px}
-input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px}
-button{padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px;width:100%;cursor:pointer}
-.msg{padding:12px;border-radius:6px;margin:10px 0}
-.ok{background:#e8f5e9}
-.err{background:#ffebee}
-.warn{background:#fff3cd}
-.item{padding:12px;border-bottom:1px solid #eee}
+label{display:block;margin:10px 0 5px}
+input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px}
+button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+.msg{padding:12px;border-radius:6px;margin-top:15px}
+.ok{background:#e8f5e9;color:#1b5e20}
+.err{background:#ffebee;color:#b71c1c}
+.warn{background:#fff8e1;color:#f57c00}
 </style>
-</head>
-<body>
-<h2>编号登记与配对</h2>
 
 <div class="box">
-  <label>请输入编号（可以是 8 位 或 20 位纯数字）</label>
-  <input id="code" placeholder="请输入 8 位或 20 位数字编号">
+  <h3>📝 编号登记</h3>
+  <label>编号（8位 / 20位 纯数字）</label>
+  <input id="code" placeholder="请输入8位或20位数字">
 
-  <label>怎么联系您</label>
-  <input id="contact" placeholder="用于同编号受害者联系您">
+  <label>联系方式（选填）</label>
+  <input id="contact" placeholder="可填文字/数字/小红书ID/邮箱">
 
-  <button id="submit">提交登记</button>
+  <button id="submit">登记</button>
   <div id="msg"></div>
 </div>
 
 <div class="box">
-  <h3>查询编号 · 寻找同伴</h3>
-  <input id="q_code" placeholder="输入 8位/20位 编号查询">
+  <h3>🔍 编号查询</h3>
+  <label>输入编号查询</label>
+  <input id="q_code" placeholder="请输入8位或20位数字">
   <button id="query" style="background:#28a745">查询</button>
   <div id="result"></div>
 </div>
 
 <script>
-const GIST = "https://gist.githubusercontent.com/LightWild/fe73c32ddd8ad4ec118743edc3fcfd02/raw/77b4e0ef7ca29356a11e1ffc4e420c6139d3f288/gistfile1.txt";
-const API = "https://submit-gist.vercel.app/api/submit";
+// 安全接口，不暴露任何密钥
+const API_SUBMIT = "https://safe-gist.vercel.app/api/submit";
+const API_QUERY = "https://gist.githubusercontent.com/LightWild/fe73c32ddd8ad4ec118743edc3fcfd02/raw/77b4e0ef7ca29356a11e1ffc4e420c6139d3f288/gistfile1.txt";
 
 const $ = id => document.getElementById(id);
 
-// 提交登记
+// 登记
 $("#submit").onclick = async () => {
-  let code = $("#code").value.trim();
+  const code = $("#code").value.trim();
   const contact = $("#contact").value.trim();
 
-  // 只允许纯数字
   if (!/^\d+$/.test(code)) {
-    $("#msg").innerHTML = `<div class="msg err">只能输入纯数字</div>`;
+    $("#msg").innerHTML = `<div class="msg err">请输入纯数字</div>`;
     return;
   }
-
-  // 严格限制：8位 或 20位
   if (code.length !== 8 && code.length !== 20) {
-    $("#msg").innerHTML = `<div class="msg err">必须输入 8 位 或 20 位数字</div>`;
+    $("#msg").innerHTML = `<div class="msg err">必须是8位或20位数字</div>`;
     return;
   }
 
-  if (!contact) {
-    $("#msg").innerHTML = `<div class="msg err">请填写联系方式</div>`;
-    return;
-  }
+  try {
+    const res = await fetch(API_SUBMIT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, contact })
+    });
+    const data = await res.json();
 
-  const r = await fetch(API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, contact })
-  });
-  const d = await r.json();
-  $("#msg").innerHTML = d.success
-    ? `<div class="msg ok">提交成功</div>`
-    : `<div class="msg err">提交失败</div>`;
+    if (data.success) {
+      $("#msg").innerHTML = `<div class="msg ok">登记成功</div>`;
+    } else {
+      const showContact = data.existContact || "您的伙伴没有留下联系方式";
+      $("#msg").innerHTML = `<div class="msg err">登记失败，编号已存在<br>联系人：${showContact}</div>`;
+    }
+  } catch (e) {
+    $("#msg").innerHTML = `<div class="msg err">网络错误，请重试</div>`;
+  }
 };
 
-// 查询编号
+// 查询
 $("#query").onclick = async () => {
-  let code = $("#q_code").value.trim();
-  if (!code) return $("#result").innerHTML = `<div class="msg err">请输入编号</div>`;
+  const code = $("#q_code").value.trim();
 
   if (!/^\d+$/.test(code)) {
-    $("#result").innerHTML = `<div class="msg err">只能输入纯数字</div>`;
+    $("#result").innerHTML = `<div class="msg err">请输入纯数字</div>`;
     return;
   }
   if (code.length !== 8 && code.length !== 20) {
-    $("#result").innerHTML = `<div class="msg err">必须输入 8 位 或 20 位数字</div>`;
+    $("#result").innerHTML = `<div class="msg err">必须是8位或20位数字</div>`;
     return;
   }
 
-  const r = await fetch(GIST);
-  const d = await r.json();
-  const list = (d.records || []).filter(it => it.code === code);
+  try {
+    const res = await fetch(API_QUERY);
+    const data = await res.json();
+    const list = data.records || [];
+    const item = list.find(i => i.code === code);
 
-  if (list.length === 0) {
-    $("#result").innerHTML = `<div class="msg ok">暂无登记</div>`;
-    return;
+    if (item) {
+      const showContact = item.contact || "您的伙伴没有留下联系方式";
+      $("#result").innerHTML = `<div class="msg warn">已登记<br>联系人：${showContact}</div>`;
+    } else {
+      $("#result").innerHTML = `<div class="msg ok">暂无登记</div>`;
+    }
+  } catch (e) {
+    $("#result").innerHTML = `<div class="msg err">查询失败</div>`;
   }
-
-  let html = `<div class="msg warn">该编号已登记 ${list.length} 人：</div>`;
-  list.forEach((it, i) => {
-    html += `
-    <div class="item">
-      联系方式：${it.contact}
-    </div>`;
-  });
-  $("#result").innerHTML = html;
 };
 </script>
 </body>
