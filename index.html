@@ -2,134 +2,107 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>编号重复检测工具</title>
+<title>编号登记与维权留言</title>
 <style>
 *{box-sizing:border-box}
-body{max-width:650px;margin:40px auto;padding:0 20px;font-family:system-ui}
-h2{text-align:center;color:#222}
+body{max-width:600px;margin:40px auto;padding:0 20px;font-family:system-ui}
 .box{border:1px solid #ddd;border-radius:10px;padding:20px;margin-top:20px}
-label{display:block;margin:12px 0 6px;font-weight:500}
-input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:16px}
-button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px;font-size:16px;margin-top:20px;cursor:pointer}
-.tip{font-size:12px;color:#666;margin-top:4px}
-.red{color:red}
-.msg{padding:12px;border-radius:6px;margin-top:16px;font-size:15px}
-.ok{background:#e8f5e9;color:#1b5e20}
-.err{background:#ffebee;color:#b71c1c}
-.warn{background:#fff8e1;color:#ff8f00}
-.query-box{margin-top:30px;padding-top:20px;border-top:1px solid #eee}
-.disclaimer{margin-top:30px;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:10px}
+label{display:block;margin:12px 0 6px}
+input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px}
+button{padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px;width:100%;cursor:pointer}
+.msg{padding:12px;border-radius:6px;margin:10px 0}
+.ok{background:#e8f5e9}
+.err{background:#ffebee}
+.warn{background:#fff3cd}
+.item{padding:10px;border-bottom:1px solid #eee}
+.del{background:#dc3545;padding:6px 10px;border-radius:6px;color:white;border:none;cursor:pointer}
 </style>
 </head>
 <body>
-<h2>编号重复检测工具</h2>
+<h2>编号登记与维权留言</h2>
+
 <div class="box">
-<div class="red">功能：检测同一编号是否被多人提交，仅供民间互助参考</div>
+  <label>输入编号</label>
+  <input id="code" placeholder="请输入您的编号">
 
-<label>您的编号（登记码/标识码）</label>
-<input type="text" id="code" placeholder="请输入您的唯一编号" required>
+  <label>留言（用于寻找同伴维权）</label>
+  <input id="content" placeholder="例如：我也有此编号，寻找同伴">
 
-<label>联系邮箱（仅用于脱敏展示）</label>
-<input type="email" id="email" placeholder="请输入您的邮箱" required>
-<div class="tip">一个邮箱仅可提交一次</div>
+  <label>删除密码（仅自己记住，用于删帖）</label>
+  <input id="pwd" type="password" placeholder="设置 only 你知道的密码">
 
-<button id="submit">提交检测</button>
-<div id="msg"></div>
+  <button id="submit">提交登记 & 留言</button>
+  <div id="msg"></div>
 </div>
 
-<div class="box query-box">
-<h3>🔍 查询编号是否重复</h3>
-<input type="text" id="q_code" placeholder="输入编号查询">
-<button id="query" style="background:#28a745;margin-top:10px">查询是否重复</button>
-<div id="query_result"></div>
-</div>
-
-<div class="disclaimer">
-  声明：本工具为民间公益工具，数据由网友自主上传，非官方平台，不具备法律效力，不代表任何机构立场。使用者自行承担相关责任。
+<div class="box">
+  <h3>查询编号</h3>
+  <input id="q_code" placeholder="输入编号查询">
+  <button id="query" style="background:#28a745">查询</button>
+  <div id="result"></div>
 </div>
 
 <script>
-// ==================== 你已有的信息（我帮你填好了）====================
-const GIST_RAW_URL = "https://gist.githubusercontent.com/LightWild/fe73c32ddd8ad4ec118743edc3fcfd02/raw/77b4e0ef7ca29356a11e1ffc4e420c6139d3f288/gistfile1.txt";
-const WEBHOOK_URL = "https://submit-gist.vercel.app/api/submit";
-// ==================================================================
+const GIST = "https://gist.githubusercontent.com/LightWild/fe73c32ddd8ad4ec118743edc3fcfd02/raw/77b4e0ef7ca29356a11e1ffc4e420c6139d3f288/gistfile1.txt";
+const API = "https://submit-gist.vercel.app/api/submit";
 
 const $ = id => document.getElementById(id);
 
-function maskEmail(email) {
-  if (!email) return "";
-  const [name, domain] = email.split('@');
-  return name[0] + "***@" + domain;
-}
+// 提交留言
+$("#submit").onclick = async ()=>{
+  const code = $("#code").value.trim();
+  const content = $("#content").value.trim();
+  const pwd = $("#pwd").value.trim();
+  if(!code || !content || !pwd) return $("#msg").innerHTML = `<div class="msg err">请填写完整</div>`;
 
-function showMsg(el, text, type) {
-  $(el).innerHTML = `<div class="msg ${type}">${text}</div>`;
-}
-
-// 读取数据（查询用）
-async function loadData() {
-  try {
-    const res = await fetch(GIST_RAW_URL);
-    return await res.json();
-  } catch (e) {
-    return { records: [] };
-  }
-}
-
-// 提交数据（安全提交，不暴露密钥）
-$('submit').onclick = async () => {
-  const email = $('email').value.trim();
-  const code = $('code').value.trim();
-
-  if (!email || !code) {
-    showMsg('msg', '请填写完整信息', 'err');
-    return;
-  }
-
-  try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code })
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      showMsg('msg', '✅ 提交成功！该编号暂无重复', 'ok');
-    } else if (data.reason === "email_exists") {
-      showMsg('msg', '❌ 该邮箱已提交过', 'err');
-    } else if (data.reason === "code_exists") {
-      showMsg('msg', `⚠️ 该编号已被登记<br>联系人：${maskEmail(data.existing_email)}`, 'warn');
-    } else {
-      showMsg('msg', '❌ 提交失败，请稍后重试', 'err');
-    }
-  } catch (err) {
-    showMsg('msg', '❌ 网络错误，请重试', 'err');
-  }
+  const r = await fetch(API, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ code, content, pwd })
+  });
+  const d = await r.json();
+  $("#msg").innerHTML = d.success ? `<div class="msg ok">提交成功</div>` : `<div class="msg err">提交失败</div>`;
 };
 
 // 查询
-$('query').onclick = async () => {
-  const code = $('q_code').value.trim();
-  if (!code) {
-    showMsg('query_result', '请输入编号', 'err');
+$("#query").onclick = async ()=>{
+  const code = $("#q_code").value.trim();
+  if(!code) return $("#result").innerHTML = `<div class="msg err">请输入编号</div>`;
+
+  const r = await fetch(GIST);
+  const d = await r.json();
+  const list = (d.records || []).filter(it=>it.code === code);
+
+  if(list.length===0){
+    $("#result").innerHTML = `<div class="msg ok">暂无登记</div>`;
     return;
   }
 
-  try {
-    const data = await loadData();
-    const found = data.records.find(r => r.code === code);
-
-    if (found) {
-      showMsg('query_result', `⚠️ 该编号已被登记<br>联系人：${maskEmail(found.email)}`, 'warn');
-    } else {
-      showMsg('query_result', '✅ 该编号暂无记录', 'ok');
-    }
-  } catch (e) {
-    showMsg('query_result', '❌ 查询失败', 'err');
-  }
+  let html = `<div class="msg warn">该编号已有 ${list.length} 条留言：</div>`;
+  list.forEach((it,i)=>{
+    html += `
+    <div class="item">
+      <div>${it.content}</div>
+      <input placeholder="删除密码" id="del_pwd_${i}" style="width:60%;display:inline-block">
+      <button class="del" onclick="del('${code}','${i}')">删除</button>
+    </div>`;
+  });
+  $("#result").innerHTML = html;
 };
+
+// 删除
+async function del(code, index){
+  const pwd = $(`del_pwd_${index}`).value.trim();
+  if(!pwd)return alert("输入删除密码");
+  const r = await fetch(API, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ del:true, code, index, pwd })
+  });
+  const d = await r.json();
+  alert(d.success?"删除成功":"密码错误");
+  if(d.success) $("#query").click();
+}
 </script>
 </body>
 </html>
