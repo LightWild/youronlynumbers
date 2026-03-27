@@ -5,7 +5,7 @@ export default async function handler(req, res) {
 
   try {
     const GIST_ID = "fe73c32ddd8ad4ec118743edc3fcfd02";
-    const GIST_TOKEN = "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";
+    const GIST_TOKEN = "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";
     const GIST_FILENAME = "data.json";
 
     const gistRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
