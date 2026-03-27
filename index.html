@@ -1,100 +1,51 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>号码登记</title>
+    <title>用户登记查询系统</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-        body {
-            max-width: 500px;
-            margin: 50px auto;
-            padding: 20px;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        input {
-            padding: 12px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
-        button {
-            padding: 12px;
-            font-size: 16px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        #msg {
-            margin-top: 10px;
-            font-size: 15px;
-            min-height: 20px;
-        }
+        body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; }
+        input, button { width: 100%; padding: 10px; margin-top: 10px; box-sizing: border-box; }
+        #result { margin-top: 20px; padding: 10px; border-radius: 5px; display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>号码登记系统</h2>
-        <input type="text" id="number" placeholder="请输入登记号码" />
-        <input type="text" id="contact" placeholder="请输入联系方式" />
-        <button id="submitBtn">立即登记</button>
-        <div id="msg"></div>
-    </div>
+    <h3>用户登记与查询</h3>
+    <input type="text" id="code" placeholder="输入数字编码">
+    <input type="text" id="contact" placeholder="输入联系方式（可选）">
+    <button onclick="submitData()">点击登记</button>
+    <div id="result"></div>
 
-    <!-- JS 放在最后，绝对不会报错 -->
     <script>
-        // 获取元素
-        const submitBtn = document.getElementById('submitBtn');
-        const msg = document.getElementById('msg');
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzEUr6KatjLjX3xMbQg91dzposNfJy0EBQghh6rOL5HO3V_dhP4WT0-hiWJBXZvUcKE/exec";
 
-        // 绑定点击事件
-        submitBtn.onclick = async function () {
-            const number = document.getElementById('number').value.trim();
-            const contact = document.getElementById('contact').value.trim();
+        async function submitData() {
+            const code = document.getElementById('code').value;
+            const contact = document.getElementById('contact').value;
+            const resultDiv = document.getElementById('result');
 
-            if (!number || !contact) {
-                msg.innerHTML = "⚠️ 请填写完整信息！";
-                msg.style.color = "red";
-                return;
-            }
+            if (!code) { alert("请输入编码"); return; }
 
-            msg.innerHTML = "⏳ 提交中...";
-            msg.style.color = "#007bff";
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = "正在处理...";
+            resultDiv.style.background = "#eee";
 
             try {
-                const res = await fetch('/api/submit', {
+                const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ number, contact })
+                    mode: 'no-cors', // 注意：no-cors 模式无法读取返回的 JSON，但可以成功写入
+                    body: JSON.stringify({ code: code, contact: contact })
                 });
 
-                const data = await res.json();
-                if (data.success) {
-                    msg.innerHTML = "✅ 登记成功！";
-                    msg.style.color = "green";
-                } else {
-                    msg.innerHTML = "❌ " + data.msg;
-                    msg.style.color = "red";
-                }
-            } catch (err) {
-                msg.innerHTML = "❌ 提交失败，请重试";
-                msg.style.color = "red";
+                // 由于 Google Script 的跨域限制，no-cors 无法获取 response body
+                // 这里我们做一个简单的逻辑：提示用户已提交，请刷新查看
+                resultDiv.innerHTML = "登记请求已发出。如果是查询已有编码，请稍等数据同步或再次输入确认。";
+                resultDiv.style.background = "#d4edda";
+                
+            } catch (error) {
+                resultDiv.innerHTML = "提交出错，请检查网络。";
             }
-        };
+        }
     </script>
 </body>
 </html>
