@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>发票共用检测系统</title>
+<title>编号重复检测工具</title>
 <style>
 *{box-sizing:border-box}
 body{max-width:650px;margin:40px auto;padding:0 20px;font-family:system-ui}
@@ -18,101 +18,116 @@ button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border
 .err{background:#ffebee;color:#b71c1c}
 .warn{background:#fff8e1;color:#ff8f00}
 .query-box{margin-top:30px;padding-top:20px;border-top:1px solid #eee}
+.disclaimer{margin-top:30px;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:10px}
 </style>
 </head>
 <body>
-<h2>发票共用检测系统</h2>
+<h2>编号重复检测工具</h2>
 <div class="box">
-<div class="red">用途：检测平台是否把<b>同一张发票</b>发给多个人</div>
+<div class="red">功能：检测同一编号是否被多人提交，仅供民间互助参考</div>
 
-<label>你的联系邮箱（仅用于后台证据留存，不会公开）</label>
-<input type="email" id="email" placeholder="请输入你的邮箱" required>
-<div class="tip">一个邮箱只能登记一次，防止恶意提交</div>
+<label>您的编号（登记码/标识码）</label>
+<input type="text" id="code" placeholder="请输入您的唯一编号" required>
 
-<label>发票号码（唯一号码，每张发票只有一个）</label>
-<input type="text" id="num" placeholder="请输入发票号码" required>
+<label>联系邮箱（仅用于脱敏展示）</label>
+<input type="email" id="email" placeholder="请输入您的邮箱" required>
+<div class="tip">一个邮箱仅可提交一次</div>
 
-<button id="submit">提交登记</button>
+<button id="submit">提交检测</button>
 <div id="msg"></div>
 </div>
 
 <div class="box query-box">
-<h3>🔍 查询发票是否被共用</h3>
-<input type="text" id="q_num" placeholder="输入发票号码">
-<button id="query" style="background:#28a745;margin-top:10px">查询是否被重复登记</button>
+<h3>🔍 查询编号是否重复</h3>
+<input type="text" id="q_code" placeholder="输入编号查询">
+<button id="query" style="background:#28a745;margin-top:10px">查询是否重复</button>
 <div id="query_result"></div>
 </div>
 
+<div class="disclaimer">
+  声明：本工具为民间公益工具，数据由网友自主上传，非官方平台，不具备法律效力，不代表任何机构立场。使用者自行承担相关责任。
+</div>
+
 <script>
-// 本地存储
-let invoiceRecords = JSON.parse(localStorage.getItem('invoiceRecords')) || {};
-let usedEmails = JSON.parse(localStorage.getItem('usedEmails')) || [];
+// ==================== 你已有的信息（我帮你填好了）====================
+const GIST_RAW_URL = "https://gist.githubusercontent.com/LightWild/fe73c32ddd8ad4ec118743edc3fcfd02/raw/77b4e0ef7ca29356a11e1ffc4e420c6139d3f288/gistfile1.txt";
+const WEBHOOK_URL = "https://submit-gist.vercel.app/api/submit";
+// ==================================================================
 
 const $ = id => document.getElementById(id);
 
-// 脱敏邮箱：abc123@gmail.com → a***@gmail.com
 function maskEmail(email) {
+  if (!email) return "";
   const [name, domain] = email.split('@');
-  return name[0] + '***@' + domain;
+  return name[0] + "***@" + domain;
 }
 
-// 提示信息
-function showMsg(text, type) {
-  $('msg').innerHTML = `<div class="msg ${type}">${text}</div>`;
-}
-function showQueryMsg(text, type) {
-  $('query_result').innerHTML = `<div class="msg ${type}">${text}</div>`;
+function showMsg(el, text, type) {
+  $(el).innerHTML = `<div class="msg ${type}">${text}</div>`;
 }
 
-// 提交
-$('submit').onclick = () => {
+// 读取数据（查询用）
+async function loadData() {
+  try {
+    const res = await fetch(GIST_RAW_URL);
+    return await res.json();
+  } catch (e) {
+    return { records: [] };
+  }
+}
+
+// 提交数据（安全提交，不暴露密钥）
+$('submit').onclick = async () => {
   const email = $('email').value.trim();
-  const num = $('num').value.trim();
+  const code = $('code').value.trim();
 
-  if (!email || !num) {
-    showMsg("请填写完整信息", "err");
-    return;
-  }
-  if (!email.includes('@')) {
-    showMsg("请输入正确邮箱", "err");
+  if (!email || !code) {
+    showMsg('msg', '请填写完整信息', 'err');
     return;
   }
 
-  // 一个邮箱只能提交一次
-  if (usedEmails.includes(email)) {
-    showMsg("❌ 该邮箱已登记过，禁止重复提交", "err");
-    return;
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      showMsg('msg', '✅ 提交成功！该编号暂无重复', 'ok');
+    } else if (data.reason === "email_exists") {
+      showMsg('msg', '❌ 该邮箱已提交过', 'err');
+    } else if (data.reason === "code_exists") {
+      showMsg('msg', `⚠️ 该编号已被登记<br>联系人：${maskEmail(data.existing_email)}`, 'warn');
+    } else {
+      showMsg('msg', '❌ 提交失败，请稍后重试', 'err');
+    }
+  } catch (err) {
+    showMsg('msg', '❌ 网络错误，请重试', 'err');
   }
-
-  // 发票是否已存在
-  if (invoiceRecords[num]) {
-    showMsg("⚠️ 警告：该发票已被他人登记！存在发票共用嫌疑", "warn");
-    return;
-  }
-
-  // 保存
-  invoiceRecords[num] = email;
-  usedEmails.push(email);
-  localStorage.setItem('invoiceRecords', JSON.stringify(invoiceRecords));
-  localStorage.setItem('usedEmails', JSON.stringify(usedEmails));
-
-  showMsg("✅ 登记成功！该发票暂无重复记录", "ok");
 };
 
-// 查询（显示脱敏邮箱，不泄露隐私）
-$('query').onclick = () => {
-  const num = $('q_num').value.trim();
-
-  if (!num) {
-    showQueryMsg("请输入发票号码", "err");
+// 查询
+$('query').onclick = async () => {
+  const code = $('q_code').value.trim();
+  if (!code) {
+    showMsg('query_result', '请输入编号', 'err');
     return;
   }
 
-  if (invoiceRecords[num]) {
-    const email = invoiceRecords[num];
-    showQueryMsg(`⚠️ 结果：该发票已被登记<br>登记人：${maskEmail(email)}`, "warn");
-  } else {
-    showQueryMsg("✅ 结果：该发票暂无登记记录", "ok");
+  try {
+    const data = await loadData();
+    const found = data.records.find(r => r.code === code);
+
+    if (found) {
+      showMsg('query_result', `⚠️ 该编号已被登记<br>联系人：${maskEmail(found.email)}`, 'warn');
+    } else {
+      showMsg('query_result', '✅ 该编号暂无记录', 'ok');
+    }
+  } catch (e) {
+    showMsg('query_result', '❌ 查询失败', 'err');
   }
 };
 </script>
