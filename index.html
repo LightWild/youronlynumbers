@@ -25,7 +25,7 @@ button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border
 <div class="box">
 <div class="red">用途：检测平台是否把<b>同一张发票</b>发给多个人</div>
 
-<label>你的联系邮箱（仅用于追溯，不会完整公开）</label>
+<label>你的联系邮箱（仅用于后台证据留存，不会公开）</label>
 <input type="email" id="email" placeholder="请输入你的邮箱" required>
 <div class="tip">一个邮箱只能登记一次，防止恶意提交</div>
 
@@ -39,7 +39,7 @@ button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border
 <div class="box query-box">
 <h3>🔍 查询发票是否被共用</h3>
 <input type="text" id="q_num" placeholder="输入发票号码">
-<button id="query" style="background:#28a745;margin-top:10px">查询该发票登记人</button>
+<button id="query" style="background:#28a745;margin-top:10px">查询是否被重复登记</button>
 <div id="query_result"></div>
 </div>
 
@@ -50,11 +50,10 @@ let usedEmails = JSON.parse(localStorage.getItem('usedEmails')) || [];
 
 const $ = id => document.getElementById(id);
 
-// 脱敏邮箱
+// 脱敏邮箱：abc123@gmail.com → a***@gmail.com
 function maskEmail(email) {
-  if (!email) return "";
   const [name, domain] = email.split('@');
-  return name[0] + "***@" + domain;
+  return name[0] + '***@' + domain;
 }
 
 // 提示信息
@@ -87,14 +86,12 @@ $('submit').onclick = () => {
 
   // 发票是否已存在
   if (invoiceRecords[num]) {
-    const record = invoiceRecords[num];
-    showMsg(`⚠️ 警告：该发票已被他人登记！
-<br>登记人：${maskEmail(record.email)}`, "warn");
+    showMsg("⚠️ 警告：该发票已被他人登记！存在发票共用嫌疑", "warn");
     return;
   }
 
   // 保存
-  invoiceRecords[num] = { email };
+  invoiceRecords[num] = email;
   usedEmails.push(email);
   localStorage.setItem('invoiceRecords', JSON.stringify(invoiceRecords));
   localStorage.setItem('usedEmails', JSON.stringify(usedEmails));
@@ -102,7 +99,7 @@ $('submit').onclick = () => {
   showMsg("✅ 登记成功！该发票暂无重复记录", "ok");
 };
 
-// 查询
+// 查询（显示脱敏邮箱，不泄露隐私）
 $('query').onclick = () => {
   const num = $('q_num').value.trim();
 
@@ -112,11 +109,10 @@ $('query').onclick = () => {
   }
 
   if (invoiceRecords[num]) {
-    const r = invoiceRecords[num];
-    showQueryMsg(`📌 该发票已登记
-<br>登记人：${maskEmail(r.email)}`, "ok");
+    const email = invoiceRecords[num];
+    showQueryMsg(`⚠️ 结果：该发票已被登记<br>登记人：${maskEmail(email)}`, "warn");
   } else {
-    showQueryMsg("🔍 该发票暂无登记记录", "warn");
+    showQueryMsg("✅ 结果：该发票暂无登记记录", "ok");
   }
 };
 </script>
