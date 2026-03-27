@@ -27,23 +27,18 @@ button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border
 </div>
 
 <script>
-// 安全接口（不暴露密钥，GitHub 不报警）
-const API_SUBMIT = "https://safe-gist.vercel.app/api/submit";
-
+// 替换成你自己的 Vercel 接口地址
+const API_SUBMIT = "https://你的项目名.vercel.app/api/submit";
 const $ = id => document.getElementById(id);
 
-// 登记（自带查重 + 显示他人信息）
 $("#submit").onclick = async () => {
   const code = $("#code").value.trim();
   const contact = $("#contact").value.trim();
 
-  // 验证纯数字
   if (!/^\d+$/.test(code)) {
     $("#msg").innerHTML = `<div class="msg err">请输入纯数字</div>`;
     return;
   }
-
-  // 验证长度 8 / 20 位
   if (code.length !== 8 && code.length !== 20) {
     $("#msg").innerHTML = `<div class="msg err">必须是8位或20位数字</div>`;
     return;
@@ -60,9 +55,7 @@ $("#submit").onclick = async () => {
     if (data.success) {
       $("#msg").innerHTML = `<div class="msg ok">登记成功</div>`;
     } else {
-      // 已存在 → 显示上一个人的信息（自带查询功能）
-      const showContact = data.existContact || "您的伙伴没有留下联系方式";
-      $("#msg").innerHTML = `<div class="msg err">登记失败，该编号已存在<br>联系人：${showContact}</div>`;
+      $("#msg").innerHTML = `<div class="msg err">登记失败，编号已存在<br>联系人：${data.existContact}</div>`;
     }
   } catch (e) {
     $("#msg").innerHTML = `<div class="msg err">网络错误，请重试</div>`;
