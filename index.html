@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>编号登记与维权留言</title>
+<title>编号登记与维权配对</title>
 <style>
 *{box-sizing:border-box}
 body{max-width:600px;margin:40px auto;padding:0 20px;font-family:system-ui}
@@ -14,30 +14,26 @@ button{padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px
 .ok{background:#e8f5e9}
 .err{background:#ffebee}
 .warn{background:#fff3cd}
-.item{padding:10px;border-bottom:1px solid #eee}
-.del{background:#dc3545;padding:6px 10px;border-radius:6px;color:white;border:none;cursor:pointer}
+.item{padding:12px;border-bottom:1px solid #eee}
 </style>
 </head>
 <body>
-<h2>编号登记与维权留言</h2>
+<h2>编号登记与维权配对</h2>
 
 <div class="box">
-  <label>输入编号</label>
-  <input id="code" placeholder="请输入您的编号">
+  <label>请输入编号（必须是 8 位 或 20 位纯数字）</label>
+  <input id="code" placeholder="请输入 8 位或 20 位数字编号">
 
-  <label>留言（用于寻找同伴维权）</label>
-  <input id="content" placeholder="例如：我也有此编号，寻找同伴">
+  <label>您的联系方式（邮箱/小红书号/小红书ID均可）</label>
+  <input id="contact" placeholder="用于同编号受害者联系您">
 
-  <label>删除密码（仅自己记住，用于删帖）</label>
-  <input id="pwd" type="password" placeholder="设置 only 你知道的密码">
-
-  <button id="submit">提交登记 & 留言</button>
+  <button id="submit">提交登记</button>
   <div id="msg"></div>
 </div>
 
 <div class="box">
-  <h3>查询编号</h3>
-  <input id="q_code" placeholder="输入编号查询">
+  <h3>查询编号 · 寻找同伴</h3>
+  <input id="q_code" placeholder="输入 8位/20位 编号查询">
   <button id="query" style="background:#28a745">查询</button>
   <div id="result"></div>
 </div>
@@ -48,61 +44,71 @@ const API = "https://submit-gist.vercel.app/api/submit";
 
 const $ = id => document.getElementById(id);
 
-// 提交留言
-$("#submit").onclick = async ()=>{
-  const code = $("#code").value.trim();
-  const content = $("#content").value.trim();
-  const pwd = $("#pwd").value.trim();
-  if(!code || !content || !pwd) return $("#msg").innerHTML = `<div class="msg err">请填写完整</div>`;
+// 提交登记
+$("#submit").onclick = async () => {
+  let code = $("#code").value.trim();
+  const contact = $("#contact").value.trim();
+
+  // 只允许纯数字
+  if (!/^\d+$/.test(code)) {
+    $("#msg").innerHTML = `<div class="msg err">只能输入纯数字</div>`;
+    return;
+  }
+
+  // 严格限制：8位 或 20位
+  if (code.length !== 8 && code.length !== 20) {
+    $("#msg").innerHTML = `<div class="msg err">必须输入 8 位 或 20 位数字</div>`;
+    return;
+  }
+
+  if (!contact) {
+    $("#msg").innerHTML = `<div class="msg err">请填写联系方式</div>`;
+    return;
+  }
 
   const r = await fetch(API, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ code, content, pwd })
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, contact })
   });
   const d = await r.json();
-  $("#msg").innerHTML = d.success ? `<div class="msg ok">提交成功</div>` : `<div class="msg err">提交失败</div>`;
+  $("#msg").innerHTML = d.success
+    ? `<div class="msg ok">提交成功</div>`
+    : `<div class="msg err">提交失败</div>`;
 };
 
-// 查询
-$("#query").onclick = async ()=>{
-  const code = $("#q_code").value.trim();
-  if(!code) return $("#result").innerHTML = `<div class="msg err">请输入编号</div>`;
+// 查询编号
+$("#query").onclick = async () => {
+  let code = $("#q_code").value.trim();
+  if (!code) return $("#result").innerHTML = `<div class="msg err">请输入编号</div>`;
+
+  if (!/^\d+$/.test(code)) {
+    $("#result").innerHTML = `<div class="msg err">只能输入纯数字</div>`;
+    return;
+  }
+  if (code.length !== 8 && code.length !== 20) {
+    $("#result").innerHTML = `<div class="msg err">必须输入 8 位 或 20 位数字</div>`;
+    return;
+  }
 
   const r = await fetch(GIST);
   const d = await r.json();
-  const list = (d.records || []).filter(it=>it.code === code);
+  const list = (d.records || []).filter(it => it.code === code);
 
-  if(list.length===0){
+  if (list.length === 0) {
     $("#result").innerHTML = `<div class="msg ok">暂无登记</div>`;
     return;
   }
 
-  let html = `<div class="msg warn">该编号已有 ${list.length} 条留言：</div>`;
-  list.forEach((it,i)=>{
+  let html = `<div class="msg warn">该编号已登记 ${list.length} 人：</div>`;
+  list.forEach((it, i) => {
     html += `
     <div class="item">
-      <div>${it.content}</div>
-      <input placeholder="删除密码" id="del_pwd_${i}" style="width:60%;display:inline-block">
-      <button class="del" onclick="del('${code}','${i}')">删除</button>
+      联系方式：${it.contact}
     </div>`;
   });
   $("#result").innerHTML = html;
 };
-
-// 删除
-async function del(code, index){
-  const pwd = $(`del_pwd_${index}`).value.trim();
-  if(!pwd)return alert("输入删除密码");
-  const r = await fetch(API, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ del:true, code, index, pwd })
-  });
-  const d = await r.json();
-  alert(d.success?"删除成功":"密码错误");
-  if(d.success) $("#query").click();
-}
 </script>
 </body>
 </html>
