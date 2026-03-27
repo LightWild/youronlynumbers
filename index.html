@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>发票登记查重系统</title>
+<style>
+*{box-sizing:border-box}
+body{max-width:600px;margin:40px auto;padding:0 20px;font-family:system-ui}
+h2{text-align:center;color:#222}
+.box{border:1px solid #ddd;border-radius:10px;padding:20px;margin-top:20px}
+label{display:block;margin:12px 0 6px;font-weight:500}
+input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:16px}
+button{width:100%;padding:12px;background:#0d63fd;color:white;border:none;border-radius:8px;font-size:16px;margin-top:20px;cursor:pointer}
+.tip{font-size:12px;color:#666;margin-top:4px}
+.red{color:red}
+.msg{padding:12px;border-radius:6px;margin-top:16px;font-size:15px}
+.ok{background:#e8f5e9;color:#1b5e20}
+.err{background:#ffebee;color:#b71c1c}
+.warn{background:#fff8e1;color:#ff8f00}
+</style>
+</head>
+<body>
+<h2>发票登记查重系统</h2>
+<div class="box">
+<div class="red">规则：一个税号只能提交一次，重复税号禁止提交</div>
+<label>纳税人识别号（税号，作为唯一ID）</label>
+<input type="text" id="taxid" placeholder="请输入税号">
+<div class="tip">税号一旦提交，他人不可再用此税号提交</div>
+
+<label>发票代码</label>
+<input type="text" id="code" placeholder="发票代码">
+
+<label>发票号码</label>
+<input type="text" id="num" placeholder="发票号码">
+
+<label>开票金额</label>
+<input type="text" id="money" placeholder="金额">
+
+<button id="submit">提交并查重</button>
+<div id="msg"></div>
+</div>
+
+<script>
+// 本地存储已登记税号和发票
+let taxList = JSON.parse(localStorage.getItem('taxList')) || [];
+let invoiceList = JSON.parse(localStorage.getItem('invoiceList')) || [];
+
+const $ = id => document.getElementById(id);
+const msg = (text, cls) => {
+  $('msg').innerHTML = `<div class="msg ${cls}">${text}</div>`;
+};
+
+$('submit').onclick = e => {
+  e.preventDefault();
+  const taxid = $('taxid').value.trim();
+  const code = $('code').value.trim();
+  const num = $('num').value.trim();
+  const money = $('money').value.trim();
+
+  if (!taxid || !code || !num || !money) {
+    msg('请填写完整信息', 'err');
+    return;
+  }
+
+  // 1. 检查税号是否已存在（你要的核心功能）
+  if (taxList.includes(taxid)) {
+    msg('❌ 该税号已被注册，不允许重复使用', 'err');
+    return;
+  }
+
+  // 2. 检查发票是否重复
+  const key = code + '-' + num;
+  if (invoiceList.includes(key)) {
+    msg('⚠️ 该发票已被他人登记，存在共用嫌疑', 'warn');
+    return;
+  }
+
+  // 3. 保存
+  taxList.push(taxid);
+  invoiceList.push(key);
+  localStorage.setItem('taxList', JSON.stringify(taxList));
+  localStorage.setItem('invoiceList', JSON.stringify(invoiceList));
+
+  msg('✅ 登记成功！当前无重复', 'ok');
+};
+</script>
+</body>
+</html>
