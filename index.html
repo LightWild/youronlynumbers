@@ -1,66 +1,100 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<meta charset="UTF-8">
-<title>编号登记</title>
-<style>
-*{box-sizing:border-box}
-body{max-width:500px;margin:30px auto;padding:0 15px;font-family:Arial}
-.box{border:1px solid #ddd;border-radius:10px;padding:20px;margin-top:20px}
-label{display:block;margin:10px 0 5px}
-input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px}
-button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer}
-.msg{padding:12px;border-radius:6px;margin-top:15px}
-.ok{background:#e8f5e9;color:#1b5e20}
-.err{background:#ffebee;color:#b71c1c}
-</style>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>号码登记</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            padding: 12px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #msg {
+            margin-top: 10px;
+            font-size: 15px;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>号码登记系统</h2>
+        <input type="text" id="number" placeholder="请输入登记号码" />
+        <input type="text" id="contact" placeholder="请输入联系方式" />
+        <button id="submitBtn">立即登记</button>
+        <div id="msg"></div>
+    </div>
 
-<div class="box">
-  <h3>编号登记</h3>
-  <label>编号（8位 / 20位 纯数字）</label>
-  <input id="code" placeholder="请输入8位或20位数字">
+    <!-- JS 放在最后，绝对不会报错 -->
+    <script>
+        // 获取元素
+        const submitBtn = document.getElementById('submitBtn');
+        const msg = document.getElementById('msg');
 
-  <label>联系方式（选填）</label>
-  <input id="contact" placeholder="可填文字/数字/ID/邮箱">
+        // 绑定点击事件
+        submitBtn.onclick = async function () {
+            const number = document.getElementById('number').value.trim();
+            const contact = document.getElementById('contact').value.trim();
 
-  <button id="submit">登记</button>
-  <div id="msg"></div>
-</div>
+            if (!number || !contact) {
+                msg.innerHTML = "⚠️ 请填写完整信息！";
+                msg.style.color = "red";
+                return;
+            }
 
-<script>
-// 替换成你自己的 Vercel 接口地址
-const API_SUBMIT = "https://你的项目名.vercel.app/api/submit";
-const $ = id => document.getElementById(id);
+            msg.innerHTML = "⏳ 提交中...";
+            msg.style.color = "#007bff";
 
-$("#submit").onclick = async () => {
-  const code = $("#code").value.trim();
-  const contact = $("#contact").value.trim();
+            try {
+                const res = await fetch('/api/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number, contact })
+                });
 
-  if (!/^\d+$/.test(code)) {
-    $("#msg").innerHTML = `<div class="msg err">请输入纯数字</div>`;
-    return;
-  }
-  if (code.length !== 8 && code.length !== 20) {
-    $("#msg").innerHTML = `<div class="msg err">必须是8位或20位数字</div>`;
-    return;
-  }
-
-  try {
-    const res = await fetch(API_SUBMIT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, contact })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      $("#msg").innerHTML = `<div class="msg ok">登记成功</div>`;
-    } else {
-      $("#msg").innerHTML = `<div class="msg err">登记失败，编号已存在<br>联系人：${data.existContact}</div>`;
-    }
-  } catch (e) {
-    $("#msg").innerHTML = `<div class="msg err">网络错误，请重试</div>`;
-  }
-};
-</script>
+                const data = await res.json();
+                if (data.success) {
+                    msg.innerHTML = "✅ 登记成功！";
+                    msg.style.color = "green";
+                } else {
+                    msg.innerHTML = "❌ " + data.msg;
+                    msg.style.color = "red";
+                }
+            } catch (err) {
+                msg.innerHTML = "❌ 提交失败，请重试";
+                msg.style.color = "red";
+            }
+        };
+    </script>
 </body>
 </html>
