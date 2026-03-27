@@ -4,9 +4,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 模拟返回数据
-    return res.json({ success: true, data: [] });
-  } catch (error) {
-    return res.status(500).json({ success: false, msg: '服务器错误' });
+    const GIST_ID = "你的GistID";
+    const GIST_TOKEN = "你的GitHubToken";
+    const GIST_FILENAME = "data.json";
+
+    const gistRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: {
+        'Authorization': `token ${GIST_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    if (!gistRes.ok) {
+      return res.status(500).json({ success: false, msg: '读取数据库失败' });
+    }
+
+    const gistData = await gistRes.json();
+    const fileContent = gistData.files[GIST_FILENAME].content;
+    const data = JSON.parse(fileContent);
+
+    return res.json({ success: true, data: data.records });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, msg: "服务器错误" });
   }
 }
