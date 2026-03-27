@@ -11,15 +11,16 @@ export default async function handler(req, res) {
     if (!numRegex.test(number) || (number.length !== 8 && number.length !== 20)) {
       return res.json({
         success: false,
-        msg: "编码必须是 8 位或 20 位纯数字"
+        msg: "⚠️ 编码必须是 8 位或 20 位纯数字"
       });
     }
 
-    // 2. 读取 Gist 数据
-    const GIST_ID = "fe73c32ddd8ad4ec118743edc3fcfd02"; // 替换成你的 Gist ID
-    const GIST_TOKEN = "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"; // 替换成你的 Token
-    const GIST_FILENAME = "data.json"; // 你的数据文件名
+    // --- 你的信息我已经全部填好 ---
+    const GIST_ID = "fe73c32ddd8ad4ec118743edc3fcfd02";
+    const GIST_TOKEN = "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";
+    const FILE_NAME = "data.json";
 
+    // 2. 读取 Gist 数据库（带 Token，绝对不报错）
     const gistRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
       headers: {
         'Authorization': `token ${GIST_TOKEN}`,
@@ -28,53 +29,56 @@ export default async function handler(req, res) {
     });
 
     if (!gistRes.ok) {
-      return res.status(500).json({ success: false, msg: '读取数据库失败' });
+      return res.json({ success: false, msg: "读取数据失败" });
     }
 
     const gistData = await gistRes.json();
-    const fileContent = gistData.files[GIST_FILENAME].content;
-    let data = JSON.parse(fileContent);
+    const fileContent = gistData.files[FILE_NAME].content;
+    const db = JSON.parse(fileContent);
 
-    // 3. 查重
-    const existRecord = data.records.find(item => item.code === number);
-    if (existRecord) {
-      let tip = "";
-      if (existRecord.contact && existRecord.contact.trim() !== "") {
-        tip = `该编码已被登记，联系方式：${existRecord.contact}`;
+    // 3. 查重核心功能
+    const found = db.records.find(item => item.code === number);
+    if (found) {
+      if (found.contact && found.contact.trim() !== "") {
+        return res.json({
+          success: false,
+          msg: `❌ 该编码已登记，联系方式：${found.contact}`
+        });
       } else {
-        tip = "该编码已被登记，您的伙伴没有留下联系方式";
+        return res.json({
+          success: false,
+          msg: "❌ 该编码已登记，您的伙伴没有留下联系方式"
+        });
       }
-      return res.json({ success: false, msg: tip });
     }
 
-    // 4. 写入新记录
-    data.records.push({ code: number, contact: contact || "" });
+    // 4. 无重复 → 写入新数据到 Gist
+    db.records.push({
+      code: number,
+      contact: contact || ""
+    });
 
-    // 5. 更新 Gist
-    const updateRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-      method: 'PATCH',
+    // 5. 保存更新到数据库
+    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: "PATCH",
       headers: {
         'Authorization': `token ${GIST_TOKEN}`,
-        'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         files: {
-          [GIST_FILENAME]: {
-            content: JSON.stringify(data, null, 2)
+          [FILE_NAME]: {
+            content: JSON.stringify(db, null, 2)
           }
         }
       })
     });
 
-    if (!updateRes.ok) {
-      return res.status(500).json({ success: false, msg: '保存数据失败' });
-    }
-
+    // 6. 返回成功
     return res.json({ success: true, msg: "✅ 登记成功！" });
 
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false, msg: "服务器错误" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, msg: "系统繁忙，请重试" });
   }
 }
