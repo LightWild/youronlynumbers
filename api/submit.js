@@ -15,12 +15,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- 你的信息我已经全部填好 ---
+    // --- 你的真实配置（已修正） ---
     const GIST_ID = "fe73c32ddd8ad4ec118743edc3fcfd02";
     const GIST_TOKEN = "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";
-    const FILE_NAME = "data.json";
+    const FILE_NAME = "gistfile1.txt"; // ✅ 这才是你真实的文件名！
 
-    // 2. 读取 Gist 数据库（带 Token，绝对不报错）
+    // 2. 读取 Gist
     const gistRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
       headers: {
         'Authorization': `token ${GIST_TOKEN}`,
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     });
 
     if (!gistRes.ok) {
-      return res.json({ success: false, msg: "读取数据失败" });
+      return res.json({ success: false, msg: `读取数据失败: ${gistRes.status}` });
     }
 
     const gistData = await gistRes.json();
@@ -52,13 +52,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. 无重复 → 写入新数据到 Gist
-    db.records.push({
-      code: number,
-      contact: contact || ""
-    });
+    // 4. 写入新数据
+    db.records.push({ code: number, contact: contact || "" });
 
-    // 5. 保存更新到数据库
+    // 5. 更新 Gist
     await fetch(`https://api.github.com/gists/${GIST_ID}`, {
       method: "PATCH",
       headers: {
@@ -74,11 +71,10 @@ export default async function handler(req, res) {
       })
     });
 
-    // 6. 返回成功
     return res.json({ success: true, msg: "✅ 登记成功！" });
 
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, msg: "系统繁忙，请重试" });
+    return res.json({ success: false, msg: "系统繁忙，请重试" });
   }
 }
