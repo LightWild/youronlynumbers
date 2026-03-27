@@ -2,86 +2,122 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>发票登记查重系统</title>
+<title>发票共用检测系统</title>
 <style>
 *{box-sizing:border-box}
-body{max-width:600px;margin:40px auto;padding:0 20px;font-family:system-ui}
+body{max-width:650px;margin:40px auto;padding:0 20px;font-family:system-ui}
 h2{text-align:center;color:#222}
 .box{border:1px solid #ddd;border-radius:10px;padding:20px;margin-top:20px}
 label{display:block;margin:12px 0 6px;font-weight:500}
 input{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:16px}
-button{width:100%;padding:12px;background:#0d63fd;color:white;border:none;border-radius:8px;font-size:16px;margin-top:20px;cursor:pointer}
+button{width:100%;padding:12px;background:#0d6fdc;color:white;border:none;border-radius:8px;font-size:16px;margin-top:20px;cursor:pointer}
 .tip{font-size:12px;color:#666;margin-top:4px}
 .red{color:red}
 .msg{padding:12px;border-radius:6px;margin-top:16px;font-size:15px}
 .ok{background:#e8f5e9;color:#1b5e20}
 .err{background:#ffebee;color:#b71c1c}
 .warn{background:#fff8e1;color:#ff8f00}
+.query-box{margin-top:30px;padding-top:20px;border-top:1px solid #eee}
 </style>
 </head>
 <body>
-<h2>发票登记查重系统</h2>
+<h2>发票共用检测系统</h2>
 <div class="box">
-<div class="red">规则：一个税号只能提交一次，重复税号禁止提交</div>
-<label>纳税人识别号（税号，作为唯一ID）</label>
-<input type="text" id="taxid" placeholder="请输入税号">
-<div class="tip">税号一旦提交，他人不可再用此税号提交</div>
+<div class="red">用途：检测平台是否把<b>同一张发票</b>发给多个人</div>
 
-<label>发票代码</label>
-<input type="text" id="code" placeholder="发票代码">
+<label>你的联系邮箱（仅用于追溯，不会完整公开）</label>
+<input type="email" id="email" placeholder="请输入你的邮箱" required>
+<div class="tip">一个邮箱只能登记一次，防止恶意提交</div>
 
-<label>发票号码</label>
-<input type="text" id="num" placeholder="发票号码">
+<label>发票号码（唯一号码，每张发票只有一个）</label>
+<input type="text" id="num" placeholder="请输入发票号码" required>
 
-<label>开票金额</label>
-<input type="text" id="money" placeholder="金额">
-
-<button id="submit">提交并查重</button>
+<button id="submit">提交登记</button>
 <div id="msg"></div>
 </div>
 
+<div class="box query-box">
+<h3>🔍 查询发票是否被共用</h3>
+<input type="text" id="q_num" placeholder="输入发票号码">
+<button id="query" style="background:#28a745;margin-top:10px">查询该发票登记人</button>
+<div id="query_result"></div>
+</div>
+
 <script>
-// 本地存储已登记税号和发票
-let taxList = JSON.parse(localStorage.getItem('taxList')) || [];
-let invoiceList = JSON.parse(localStorage.getItem('invoiceList')) || [];
+// 本地存储
+let invoiceRecords = JSON.parse(localStorage.getItem('invoiceRecords')) || {};
+let usedEmails = JSON.parse(localStorage.getItem('usedEmails')) || [];
 
 const $ = id => document.getElementById(id);
-const msg = (text, cls) => {
-  $('msg').innerHTML = `<div class="msg ${cls}">${text}</div>`;
+
+// 脱敏邮箱
+function maskEmail(email) {
+  if (!email) return "";
+  const [name, domain] = email.split('@');
+  return name[0] + "***@" + domain;
+}
+
+// 提示信息
+function showMsg(text, type) {
+  $('msg').innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+function showQueryMsg(text, type) {
+  $('query_result').innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+// 提交
+$('submit').onclick = () => {
+  const email = $('email').value.trim();
+  const num = $('num').value.trim();
+
+  if (!email || !num) {
+    showMsg("请填写完整信息", "err");
+    return;
+  }
+  if (!email.includes('@')) {
+    showMsg("请输入正确邮箱", "err");
+    return;
+  }
+
+  // 一个邮箱只能提交一次
+  if (usedEmails.includes(email)) {
+    showMsg("❌ 该邮箱已登记过，禁止重复提交", "err");
+    return;
+  }
+
+  // 发票是否已存在
+  if (invoiceRecords[num]) {
+    const record = invoiceRecords[num];
+    showMsg(`⚠️ 警告：该发票已被他人登记！
+<br>登记人：${maskEmail(record.email)}`, "warn");
+    return;
+  }
+
+  // 保存
+  invoiceRecords[num] = { email };
+  usedEmails.push(email);
+  localStorage.setItem('invoiceRecords', JSON.stringify(invoiceRecords));
+  localStorage.setItem('usedEmails', JSON.stringify(usedEmails));
+
+  showMsg("✅ 登记成功！该发票暂无重复记录", "ok");
 };
 
-$('submit').onclick = e => {
-  e.preventDefault();
-  const taxid = $('taxid').value.trim();
-  const code = $('code').value.trim();
-  const num = $('num').value.trim();
-  const money = $('money').value.trim();
+// 查询
+$('query').onclick = () => {
+  const num = $('q_num').value.trim();
 
-  if (!taxid || !code || !num || !money) {
-    msg('请填写完整信息', 'err');
+  if (!num) {
+    showQueryMsg("请输入发票号码", "err");
     return;
   }
 
-  // 1. 检查税号是否已存在（你要的核心功能）
-  if (taxList.includes(taxid)) {
-    msg('❌ 该税号已被注册，不允许重复使用', 'err');
-    return;
+  if (invoiceRecords[num]) {
+    const r = invoiceRecords[num];
+    showQueryMsg(`📌 该发票已登记
+<br>登记人：${maskEmail(r.email)}`, "ok");
+  } else {
+    showQueryMsg("🔍 该发票暂无登记记录", "warn");
   }
-
-  // 2. 检查发票是否重复
-  const key = code + '-' + num;
-  if (invoiceList.includes(key)) {
-    msg('⚠️ 该发票已被他人登记，存在共用嫌疑', 'warn');
-    return;
-  }
-
-  // 3. 保存
-  taxList.push(taxid);
-  invoiceList.push(key);
-  localStorage.setItem('taxList', JSON.stringify(taxList));
-  localStorage.setItem('invoiceList', JSON.stringify(invoiceList));
-
-  msg('✅ 登记成功！当前无重复', 'ok');
 };
 </script>
 </body>
